@@ -318,6 +318,7 @@ code{font:13px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--f
           <div class="field"><label class="label" for="stRun">Run</label><select id="stRun"></select></div>
           <div class="field"><label class="label" for="stGpx">Route file (GPX, optional)</label><input type="file" id="stGpx" accept=".gpx,application/gpx+xml,text/xml,application/xml">
             <p class="cap">Not needed for runs loaded through the Garmin script, which carry their own route. The route is drawn as a clean outline, not a street map.</p></div>
+          <label class="check"><input type="checkbox" id="stPace" checked> Colour the route by pace (needs a run fetched with the latest script, or a GPX file)</label>
           <label class="check"><input type="checkbox" id="stHide" checked> Hide the first and last 200 m of the route, so home is not pinpointed</label>
           <div class="field"><label class="label" for="stLoc">Location</label><input type="text" id="stLoc" maxlength="60" placeholder="Bengaluru, India"></div>
           <div class="field"><label class="label" for="stWx">Weather during the run</label><input type="text" id="stWx" maxlength="40" placeholder="Clear, 24°C"></div>
@@ -546,7 +547,7 @@ function mapApiActivity(a) {
     asc: get('elevationGain', 'totalAscent'), ate: get('aerobicTrainingEffect'), src: 'api',
     laps: Array.isArray(a._laps) && a._laps.length >= 2 ? a._laps.map(l => ({ n: l.n, dist: l.dist, dur: l.dur, pace: l.pace, hr: l.hr, maxHr: null, cad: l.cad, gct: l.gct, vo: l.vo, stride: l.stride, power: l.power, asc: null })) : null,
     location: get('locationName') || null, load: get('activityTrainingLoad'),
-    route: Array.isArray(a._route) && a._route.length > 1 ? a._route : null, weather: (a._weather && a._weather.summary) || null,
+    route: Array.isArray(a._route) && a._route.length > 1 ? a._route : null, routeT: Array.isArray(a._routeT) && Array.isArray(a._route) && a._routeT.length === a._route.length ? a._routeT : null, weather: (a._weather && a._weather.summary) || null,
     zones: [1, 2, 3, 4, 5].map(i => get('hrTimeInZone_' + i)) };
   if (r.zones.some(z => z == null)) r.zones = null;
   r.id = runId(date, r.dist, r.dur); return r;
@@ -750,10 +751,10 @@ function generateInsights(runs, log, today) {
 
 /* ===== Share card helpers ===== */
 function parseGPX(text) {
-  const pts = [], re = /<trkpt\b([^>]*)>/g; let m;
+  const pts = [], times = [], re = /<trkpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/trkpt>)/g; let m;
   while ((m = re.exec(text))) {
     const la = /\blat="(-?[\d.]+)"/.exec(m[1]), lo = /\blon="(-?[\d.]+)"/.exec(m[1]);
-    if (la && lo) pts.push([parseFloat(la[1]), parseFloat(lo[1])]);
+    if (la && lo) { pts.push([parseFloat(la[1]), parseFloat(lo[1])]); const t = m[2] && /<time>([^<]+)<\/time>/.exec(m[2]); times.push(t ? new Date(t[1]).getTime() / 1000 : NaN); }
   }
   if (pts.length < 2) throw new Error('No track points found in this GPX file.');
   const t = /<time>([^<]+)<\/time>/.exec(text), d = t ? new Date(t[1]) : null;
@@ -763,7 +764,8 @@ function parseGPX(text) {
     const h = Math.sin((c - a) * rad / 2) ** 2 + Math.cos(a * rad) * Math.cos(c * rad) * Math.sin((e - b) * rad / 2) ** 2;
     km += 2 * R * Math.asin(Math.sqrt(h));
   }
-  return { pts, date: d && !isNaN(d) ? ymdLocal(d) : null, km };
+  const timed = times.every(v => isFinite(v)) && times[times.length - 1] > times[0];
+  return { pts, times: timed ? times.map(v => v - times[0]) : null, date: d && !isNaN(d) ? ymdLocal(d) : null, km };
 }
 /* Fits a lat/lon track into a w by h box, keeping its true shape (longitude is scaled by cos(latitude)). */
 function routeToXY(pts, w, h, pad, maxPts) {
@@ -833,9 +835,9 @@ function exampleRuns(today) {
             'This page keeps that record next to the race days that make it worth it. The plan is simple: 21.1 km, injury-free, within a year.'],
     cover: { src: 'photos/cover.jpg', alt: 'A runner with both arms raised in victory signs among other runners at a Wipro marathon' },
     photos: [
-      { src: 'photos/wipro.jpg', alt: 'Runner posing with a medal in front of the Wipro Bengaluru Marathon backdrop', pos: '50% 30%' },
-      { src: 'photos/medal.jpg', alt: 'Two runners showing their finisher medals in a stadium', pos: '50% 30%' },
-      { src: 'photos/kerala.jpg', alt: 'Runner with a medal beside a backwater canal lined with coconut palms', pos: '75% 35%' }
+      { src: 'photos/wipro.jpg', alt: 'Runner posing with a medal in front of the Wipro Bengaluru Marathon backdrop', cap: '', pos: '50% 30%' },
+      { src: 'photos/medal.jpg', alt: 'Two runners showing their finisher medals in a stadium', cap: '', pos: '50% 30%' },
+      { src: 'photos/kerala.jpg', alt: 'Runner with a medal beside a backwater canal lined with coconut palms', cap: '', pos: '75% 35%' }
     ],
     // Summary shown to visitors who have not loaded their own data. Edit or remove.
     snapshot: { runs: 31, km: 146.8, longest: 12.1, since: '2026-08-12' }
@@ -960,15 +962,42 @@ def is_run(activity):
     return "run" in json.dumps(activity.get("activityType", "")).lower()
 
 
-def extract_route(details, max_points=250):
-    """Pull the GPS track out of the details reply as [[lat, lon], ...], thinned to max_points."""
+def extract_route(details, total_seconds=None, max_points=400):
+    """Pull the GPS track out of the details reply, thinned to max_points.
+
+    Returns (route, times). route is [[lat, lon], ...]. times is the seconds since the start for each
+    point (same length), which lets the page colour the route by pace. times is [] when Garmin's
+    per-second samples cannot be read; the route then falls back to the plain polyline.
+    """
+    index = {d.get("key"): d.get("metricsIndex") for d in details.get("metricDescriptors") or [] if isinstance(d, dict)}
+    rows = [r.get("metrics") or [] for r in details.get("activityDetailMetrics") or [] if isinstance(r, dict)]
+
+    def column(*keys):
+        for key in keys:
+            i = index.get(key)
+            if i is not None:
+                return [r[i] if i < len(r) else None for r in rows]
+        return []
+
+    lats, lons, secs = column("directLatitude"), column("directLongitude"), column("sumDuration", "sumElapsedDuration")
+    scale = pick_unit(secs, total_seconds, (1, 0.001, 0.01)) if secs and total_seconds else None
+    if lats and lons and scale is not None:
+        pts = []
+        for la, lo, t in zip(lats, lons, secs):
+            if all(isinstance(v, (int, float)) for v in (la, lo, t)) and -90 <= la <= 90 and -180 <= lo <= 180 and (la or lo):
+                pts.append((round(la, 5), round(lo, 5), round(t * scale, 1)))
+        if len(pts) >= 10:
+            if len(pts) > max_points:
+                step = -(-len(pts) // max_points)
+                pts = pts[::step] + [pts[-1]]
+            return [[p[0], p[1]] for p in pts], [p[2] for p in pts]
     geo = details.get("geoPolylineDTO") if isinstance(details, dict) else None
     points = (geo or {}).get("polyline") or []
     route = [[p["lat"], p["lon"]] for p in points if isinstance(p, dict) and "lat" in p and "lon" in p]
     if len(route) > max_points:
         step = -(-len(route) // max_points)
         route = route[::step] + [route[-1]]
-    return route
+    return route, []
 
 
 SCALES = (1, 0.1, 0.01, 10, 0.001, 100, 1000)
@@ -1075,9 +1104,9 @@ def fetch_weather(lat, lon, start_local):
 
 
 def enrich(headers, activities, details_count, with_weather):
-    """Add _route and _weather to the newest runs. Reports what it found."""
+    """Add _route, _routeT, _laps and _weather to the newest runs. Reports what it found."""
     runs = [a for a in activities if is_run(a)][:details_count]
-    routes = weathers = lap_runs = 0
+    routes = weathers = lap_runs = timed = 0
     for number, activity in enumerate(runs, 1):
         status, body = request(f"{BASE}/activity-service/activity/{activity.get('activityId')}/details", headers)
         if status == 200:
@@ -1085,10 +1114,13 @@ def enrich(headers, activities, details_count, with_weather):
                 data = json.loads(body)
             except json.JSONDecodeError:
                 data = {}
-            route = extract_route(data)
+            route, route_times = extract_route(data, activity.get("duration"))
             if route:
                 activity["_route"] = route
                 routes += 1
+                if route_times:
+                    activity["_routeT"] = route_times
+                    timed += 1
             laps, notes = build_laps(data, activity.get("distance"), activity.get("duration"))
             if len(laps) >= 2:
                 activity["_laps"] = laps
@@ -1105,7 +1137,7 @@ def enrich(headers, activities, details_count, with_weather):
                 weathers += 1
             time.sleep(0.3)  # be polite to the free weather service
         print(f"Enriched {number}/{len(runs)} runs")
-    print(f"Routes found for {routes} runs, laps for {lap_runs} runs, weather for {weathers} runs.")
+    print(f"Routes found for {routes} runs ({timed} with timing, for pace colours), laps for {lap_runs} runs, weather for {weathers} runs.")
     if runs and not routes:
         print("No route was found. Run the probe and send me the output so I can adjust the route reader.")
 
@@ -1603,22 +1635,36 @@ if __name__ == "__main__":
   });
 
   /* ---------- instagram story ---------- */
-  const ST = { frames: [], sel: 0, route: null, progEdited: false, locEdited: false, wxEdited: false, optKey: '', tok: 0, playing: false, busy: false, off: null, mid: null };
+  const ST = { frames: [], sel: 0, route: null, routeT: null, progEdited: false, locEdited: false, wxEdited: false, optKey: '', tok: 0, playing: false, busy: false, off: null, mid: null };
   const SW = 1080, SHT = 1920, F = '"Archivo Variable", "Segoe UI", system-ui, sans-serif', STORY_MAX = 10;
   const stRuns = () => data().slice().sort(byDate).reverse();
   const stRun = () => stRuns().find(r => r.id === $('#stRun').value) || stRuns()[0];
-  const stOpts = () => ({ layout: (document.querySelector('input[name=stLayout]:checked') || {}).value || 'poster', prog: $('#stProgMode').value, hide: $('#stHide').checked, loc: $('#stLoc').value.trim(), wx: $('#stWx').value.trim(), progText: $('#stProg').value.trim(), mute: $('#stMute').checked, secs: +$('#stSecs').value });
+  const stOpts = () => ({ layout: (document.querySelector('input[name=stLayout]:checked') || {}).value || 'poster', prog: $('#stProgMode').value, hide: $('#stHide').checked, pace: $('#stPace').checked, loc: $('#stLoc').value.trim(), wx: $('#stWx').value.trim(), progText: $('#stProg').value.trim(), mute: $('#stMute').checked, secs: +$('#stSecs').value });
   const stLongest = () => { const d = data(); return d.length ? Math.max(...d.map(r => r.dist)) : 0; };
   function saveBlob(blob, name) { const a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
   function rrect(c, x, y, w, h, r) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
-  /* Drops the first and last m metres of a track. */
-  function trimRoute(pts, m) {
-    if (!pts || pts.length < 8) return pts;
-    const R = 6371000, rad = Math.PI / 180, cum = [0];
-    for (let i = 1; i < pts.length; i++) { const [a, b] = pts[i - 1], [c, e] = pts[i], h = Math.sin((c - a) * rad / 2) ** 2 + Math.cos(a * rad) * Math.cos(c * rad) * Math.sin((e - b) * rad / 2) ** 2; cum.push(cum[i - 1] + 2 * R * Math.asin(Math.sqrt(h))); }
-    const total = cum[cum.length - 1]; if (total < 4 * m) return pts;
-    const out = pts.filter((_, i) => cum[i] >= m && cum[i] <= total - m); return out.length >= 2 ? out : pts;
+  const hav = (a, b) => { const R = 6371000, rad = Math.PI / 180, h = Math.sin((b[0] - a[0]) * rad / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin((b[1] - a[1]) * rad / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  /* A route is { pts: [[lat, lon], ...], t: seconds from the start, or null }. Drops the first and last m metres. */
+  function trimRoute(r, m) {
+    if (!r || r.pts.length < 8) return r;
+    const cum = [0]; for (let i = 1; i < r.pts.length; i++) cum.push(cum[i - 1] + hav(r.pts[i - 1], r.pts[i]));
+    const total = cum[cum.length - 1]; if (total < 4 * m) return r;
+    const keep = r.pts.map((_, i) => i).filter(i => cum[i] >= m && cum[i] <= total - m); if (keep.length < 2) return r;
+    return { pts: keep.map(i => r.pts[i]), t: r.t ? keep.map(i => r.t[i]) : null };
   }
+  function thinRoute(r, max) {
+    if (r.pts.length <= max) return r; const step = Math.ceil(r.pts.length / max), keep = r.pts.map((_, i) => i).filter(i => i % step === 0 || i === r.pts.length - 1);
+    return { pts: keep.map(i => r.pts[i]), t: r.t ? keep.map(i => r.t[i]) : null };
+  }
+  /* Pace in seconds per km for each segment, smoothed over a few neighbours because GPS speed jumps around. */
+  function segPaces(r) {
+    const n = r.pts.length, d = [], t = [];
+    for (let i = 1; i < n; i++) { d.push(hav(r.pts[i - 1], r.pts[i])); t.push(r.t[i] - r.t[i - 1]); }
+    const out = d.map((_, i) => { let dd = 0, tt = 0; for (let j = Math.max(0, i - 2); j <= Math.min(d.length - 1, i + 2); j++) { dd += d[j]; tt += t[j]; } return dd > 3 && tt > 0 ? tt / dd * 1000 : null; });
+    let last = out.find(v => v != null); return out.map(v => (v == null ? last : (last = v)));
+  }
+  const PACE_STOPS = [[0, [139, 92, 246]], [.5, [34, 211, 238]], [1, [253, 224, 71]]];   // slow violet, middle cyan, fast yellow
+  function paceColor(u) { u = Math.max(0, Math.min(1, u)); for (let i = 1; i < PACE_STOPS.length; i++) if (u <= PACE_STOPS[i][0]) { const [u0, c0] = PACE_STOPS[i - 1], [u1, c1] = PACE_STOPS[i], k = (u - u0) / (u1 - u0); return `rgb(${c0.map((v, j) => Math.round(v + (c1[j] - v) * k)).join(',')})`; } return 'rgb(253,224,71)'; }
   const mediaSize = f => f.kind === 'video' ? [f.el.videoWidth, f.el.videoHeight] : [f.el.naturalWidth, f.el.naturalHeight];
   function drawCover(c, f, x, y, w, h) {
     c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
@@ -1635,10 +1681,21 @@ if __name__ == "__main__":
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(ST.mid, 0, 0, SW, SHT);
   }
   function fade(c, stops, y0, y1) { const g = c.createLinearGradient(0, y0, 0, y1); stops.forEach(s => g.addColorStop(s[0], s[1])); c.fillStyle = g; c.fillRect(0, Math.min(y0, y1), SW, Math.abs(y1 - y0)); }
-  function drawRoute(c, pts, x, y, w, h, pad, lw) {
-    const xy = routeToXY(pts, w, h, pad, 600);
-    c.save(); c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 14; c.beginPath(); xy.forEach((p, i) => i ? c.lineTo(x + p[0], y + p[1]) : c.moveTo(x + p[0], y + p[1]));
-    c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = lw; c.strokeStyle = '#fff'; c.stroke(); c.restore();
+  /* Draws the route. With timing and colour on, each segment takes its pace colour; returns { lo, hi } pace for the legend. */
+  function drawRoute(c, route, x, y, w, h, pad, lw, colour) {
+    const r = thinRoute(route, 600), xy = routeToXY(r.pts, w, h, pad, 1e9), P = (colour && r.t) ? segPaces(r) : null;
+    c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+    const trace = (i0, i1) => { c.beginPath(); c.moveTo(x + xy[i0][0], y + xy[i0][1]); c.lineTo(x + xy[i1][0], y + xy[i1][1]); };
+    if (!P) { c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 14; c.beginPath(); xy.forEach((p, i) => i ? c.lineTo(x + p[0], y + p[1]) : c.moveTo(x + p[0], y + p[1])); c.lineWidth = lw; c.strokeStyle = '#fff'; c.stroke(); c.restore(); return null; }
+    c.shadowBlur = 0; c.strokeStyle = 'rgba(0,0,0,.42)'; c.lineWidth = lw + 8; c.beginPath(); xy.forEach((p, i) => i ? c.lineTo(x + p[0], y + p[1]) : c.moveTo(x + p[0], y + p[1])); c.stroke();
+    const sorted = P.slice().sort((a, b) => a - b), lo = sorted[Math.floor(sorted.length * .08)], hi = sorted[Math.floor(sorted.length * .92)], span = Math.max(hi - lo, 1);
+    c.lineWidth = lw; for (let i = 0; i < P.length; i++) { c.strokeStyle = paceColor(1 - (Math.min(Math.max(P[i], lo), hi) - lo) / span); trace(i, i + 1); c.stroke(); }
+    c.restore(); return { lo, hi };
+  }
+  function drawLegend(c, x, y, w, range) {
+    c.save(); c.shadowBlur = 0; const g = c.createLinearGradient(x, 0, x + w, 0); PACE_STOPS.slice().forEach(s => g.addColorStop(s[0], `rgb(${s[1].join(',')})`));
+    c.fillStyle = 'rgba(0,0,0,.42)'; rrect(c, x - 3, y - 3, w + 6, 18, 9); c.fill(); c.fillStyle = g; rrect(c, x, y, w, 12, 6); c.fill();
+    c.fillStyle = '#fff'; c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 8; c.font = `600 28px ${F}`; c.textAlign = 'left'; c.fillText(fmtPace(range.hi), x, y + 50); c.textAlign = 'right'; c.fillText(fmtPace(range.lo) + ' /km', x + w, y + 50); c.restore();
   }
   function fitLine(c, text, weight, px, x, y) { let p = px; c.font = `${weight} ${p}px ${F}`; while (p > 24 && c.measureText(text).width > SW - 128) { p -= 2; c.font = `${weight} ${p}px ${F}`; } c.fillText(text, x, y); }
   function statRow(c, items, x, baseY, numPx) {
@@ -1666,12 +1723,12 @@ if __name__ == "__main__":
       fitLine(c, [pace + ' /km', hr ? hr + ' bpm' : '', o.loc].filter(Boolean).join('  ·  '), 500, 44, 64, y - 58);
       fitLine(c, [o.wx, date].filter(Boolean).join('  ·  '), 500, 44, 64, y);
       c.font = `800 210px ${F}`; const bb = y - 58 - 120; c.fillText(km, 64, bb); const w = c.measureText(km).width; c.font = `600 64px ${F}`; c.fillText('km', 64 + w + 16, bb);
-      if (route) drawRoute(c, route, 64, 270, 300, 300, 22, 12);
+      if (route) { const rg = drawRoute(c, route, 64, 270, 300, 300, 22, 12, o.pace); if (rg) drawLegend(c, 84, 596, 260, rg); }
     } else if (o.layout === 'route') {
       statRow(c, [[pace, 'per km'], hr ? [String(hr), 'bpm'] : null, [time, 'time']].filter(Boolean), 64, y, 78);
       const wy = y - 150; fitLine(c, where.join('  ·  '), 500, 44, 64, wy);
       c.font = `800 170px ${F}`; const bb = wy - 70; c.fillText(km, 64, bb); const w = c.measureText(km).width; c.font = `600 56px ${F}`; c.fillText('km', 64 + w + 14, bb);
-      if (route) drawRoute(c, route, 90, 300, 900, 740, 50, 16);
+      if (route) { const rg = drawRoute(c, route, 90, 300, 900, 600, 50, 16, o.pace); if (rg) drawLegend(c, 90, bb - 225, 420, rg); }
       if (f) { c.save(); c.shadowBlur = 0; rrect(c, SW - 64 - 280, 300, 280, 340, 28); c.clip(); drawCover(c, f, SW - 64 - 280, 300, 280, 340); c.restore(); c.save(); c.shadowBlur = 0; c.lineWidth = 6; c.strokeStyle = '#fff'; rrect(c, SW - 64 - 280, 300, 280, 340, 28); c.stroke(); c.restore(); }
     } else {
       statRow(c, [[km + ' km', 'distance'], [pace, 'per km'], hr ? [String(hr), 'bpm'] : [time, 'time']], 64, y, 78);
@@ -1679,7 +1736,7 @@ if __name__ == "__main__":
     }
     c.shadowBlur = 0; c.shadowColor = 'transparent';
   }
-  function stRouteFor(run, o) { const base = ST.route || (run && run.route); return base ? (o.hide ? trimRoute(base, 200) : base) : null; }
+  function stRouteFor(run, o) { const r = ST.route ? { pts: ST.route, t: ST.routeT } : (run && run.route ? { pts: run.route, t: run.routeT && run.routeT.length === run.route.length ? run.routeT : null } : null); return r ? (o.hide ? trimRoute(r, 200) : r) : null; }
   function paintStory(c, f, idx) { const run = stRun(), o = stOpts(); drawStory(c, f, run, o, idx, stRouteFor(run, o)); }
   async function stFonts() { try { await Promise.all([document.fonts.load(`800 100px "Archivo Variable"`), document.fonts.load(`500 40px "Archivo Variable"`)]); } catch (e) { /* system fonts are used instead */ } }
   async function stDraw() { const tok = ++ST.tok; await stFonts(); if (tok !== ST.tok || ST.playing) return; paintStory($('#stCanvas').getContext('2d'), ST.frames[ST.sel] || null, ST.sel); }
@@ -1735,7 +1792,7 @@ if __name__ == "__main__":
   });
   for (const [id, key, div] of [['#stX', 'x', 1], ['#stY', 'y', 1], ['#stZ', 'zoom', 100]]) $(id).addEventListener('input', e => { const f = ST.frames[ST.sel]; if (!f) return; f[key] = +e.target.value / div; if (!ST.playing) scheduleDraw(); });
   for (const el of document.querySelectorAll('input[name=stLayout]')) el.addEventListener('change', () => { $('#stLayoutNote').textContent = LAYOUT_NOTES[stOpts().layout]; scheduleDraw(); });
-  for (const id of ['#stProgMode', '#stHide']) $(id).addEventListener('input', scheduleDraw);
+  for (const id of ['#stProgMode', '#stHide', '#stPace']) $(id).addEventListener('input', scheduleDraw);
   $('#stRun').addEventListener('input', () => { ST.locEdited = false; ST.wxEdited = false; fillFromRun(); scheduleDraw(); });
   $('#stLoc').addEventListener('input', () => { ST.locEdited = true; scheduleDraw(); });
   $('#stWx').addEventListener('input', () => { ST.wxEdited = true; scheduleDraw(); });
@@ -1750,11 +1807,11 @@ if __name__ == "__main__":
   $('#stGpx').addEventListener('change', async e => {
     const file = e.target.files[0]; if (!file) return;
     try {
-      const g = parseGPX(await file.text()); ST.route = g.pts;
+      const g = parseGPX(await file.text()); ST.route = g.pts; ST.routeT = g.times;
       const m = g.date && stRuns().find(r => r.date === g.date && Math.abs(r.dist - g.km) <= Math.max(0.5, 0.05 * r.dist));
       if (m) { $('#stRun').value = m.id; ST.locEdited = false; ST.wxEdited = false; fillFromRun(); }
       $('#stMsg').textContent = `Route loaded: ${r1(g.km)} km${m ? ', matched to your ' + niceDate(m.date) + ' run' : '. Pick the run it belongs to above'}.`;
-    } catch (err) { ST.route = null; $('#stMsg').textContent = err.message || 'Could not read that file.'; }
+    } catch (err) { ST.route = null; ST.routeT = null; $('#stMsg').textContent = err.message || 'Could not read that file.'; }
     scheduleDraw();
   });
 
