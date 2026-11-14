@@ -116,6 +116,80 @@ def extract_route(details, max_points=250):
     return route
 
 
+SCALES = (1, 0.1, 0.01, 10, 0.001, 100, 1000)
+SCALES_BY_METRIC = {"cad": (1, 2, 0.5)}
+RANGES = {"hr": (40, 230), "cad": (100, 230), "gct": (120, 500), "vo": (3, 20), "stride": (0.4, 2.8), "power": (30, 1000)}
+METRIC_KEYS = {"hr": ("directHeartRate",), "cad": ("directDoubleCadence", "directRunCadence"),
+               "gct": ("directGroundContactTime",), "vo": ("directVerticalOscillation",),
+               "stride": ("directStrideLength",), "power": ("directPower",)}
+
+
+def pick_scale(values, metric):
+    """Find the multiplier that puts a metric's typical value in a plausible range (units vary)."""
+    present = sorted(v for v in values if isinstance(v, (int, float)))
+    if not present:
+        return None
+    middle, (low, high) = present[len(present) // 2], RANGES[metric]
+    for scale in SCALES_BY_METRIC.get(metric, SCALES):
+        if low <= middle * scale <= high:
+            return scale
+    return None
+
+
+def pick_unit(values, target, options):
+    """Find the multiplier that makes the last value match the activity's known total."""
+    present = [v for v in values if isinstance(v, (int, float))]
+    if not present or not target:
+        return None
+    for option in options:
+        if 0.75 * target <= present[-1] * option <= 1.25 * target:
+            return option
+    return None
+
+
+def build_laps(details, total_m, total_s):
+    """Turn Garmin's per-second samples into per-kilometre laps. Returns (laps, notes)."""
+    index = {d.get("key"): d.get("metricsIndex") for d in details.get("metricDescriptors") or [] if isinstance(d, dict)}
+    rows = [r.get("metrics") or [] for r in details.get("activityDetailMetrics") or [] if isinstance(r, dict)]
+
+    def column(*keys):
+        for key in keys:
+            i = index.get(key)
+            if i is not None:
+                return [r[i] if i < len(r) else None for r in rows]
+        return []
+
+    dist, secs = column("sumDistance"), column("sumDuration", "sumElapsedDuration")
+    dist_scale, time_scale = pick_unit(dist, total_m, (1, 0.01, 0.001, 1000)), pick_unit(secs, total_s, (1, 0.001, 0.01))
+    if dist_scale is None or time_scale is None:
+        return [], {"problem": "distance or time units not recognised"}
+    cols, scales = {}, {}
+    for metric, keys in METRIC_KEYS.items():
+        values = column(*keys)
+        scale = pick_scale(values, metric) if values else None
+        if scale is not None:
+            cols[metric], scales[metric] = values, scale
+    groups = {}
+    for i in range(len(rows)):
+        d, t = dist[i] if i < len(dist) else None, secs[i] if i < len(secs) else None
+        if d is None or t is None:
+            continue
+        groups.setdefault(int(d * dist_scale // 1000), []).append((i, d * dist_scale, t * time_scale))
+    laps, prev_d, prev_t = [], 0.0, 0.0
+    for number, key in enumerate(sorted(groups), 1):
+        samples = groups[key]
+        end_d, end_t = samples[-1][1], samples[-1][2]
+        km, seconds = (end_d - prev_d) / 1000, end_t - prev_t
+        if km > 0 and seconds > 0:
+            lap = {"n": number, "dist": round(km, 3), "dur": round(seconds, 1), "pace": round(seconds / km, 1)}
+            for metric, values in cols.items():
+                got = [values[i] * scales[metric] for i, _, _ in samples if isinstance(values[i], (int, float))]
+                lap[metric] = round(sum(got) / len(got), 2) if got else None
+            laps.append(lap)
+        prev_d, prev_t = end_d, end_t
+    return laps, scales
+
+
 def describe_weather(code):
     """Turn an Open-Meteo weather code into a short word."""
     for limit, word in WEATHER_WORDS:
@@ -148,17 +222,26 @@ def fetch_weather(lat, lon, start_local):
 def enrich(headers, activities, details_count, with_weather):
     """Add _route and _weather to the newest runs. Reports what it found."""
     runs = [a for a in activities if is_run(a)][:details_count]
-    routes = weathers = 0
+    routes = weathers = lap_runs = 0
     for number, activity in enumerate(runs, 1):
         status, body = request(f"{BASE}/activity-service/activity/{activity.get('activityId')}/details", headers)
         if status == 200:
             try:
-                route = extract_route(json.loads(body))
+                data = json.loads(body)
             except json.JSONDecodeError:
-                route = []
+                data = {}
+            route = extract_route(data)
             if route:
                 activity["_route"] = route
                 routes += 1
+            laps, notes = build_laps(data, activity.get("distance"), activity.get("duration"))
+            if len(laps) >= 2:
+                activity["_laps"] = laps
+                lap_runs += 1
+                if lap_runs == 1:
+                    print("Lap unit scales used for the first run:", notes)
+            elif notes and not lap_runs:
+                print("Laps not built:", notes.get("problem", "no per-second data"))
         lat, lon, start = activity.get("startLatitude"), activity.get("startLongitude"), activity.get("startTimeLocal")
         if with_weather and lat is not None and lon is not None and start:
             weather = fetch_weather(lat, lon, start)
@@ -167,7 +250,7 @@ def enrich(headers, activities, details_count, with_weather):
                 weathers += 1
             time.sleep(0.3)  # be polite to the free weather service
         print(f"Enriched {number}/{len(runs)} runs")
-    print(f"Routes found for {routes} runs, weather for {weathers} runs.")
+    print(f"Routes found for {routes} runs, laps for {lap_runs} runs, weather for {weathers} runs.")
     if runs and not routes:
         print("No route was found. Run the probe and send me the output so I can adjust the route reader.")
 
