@@ -230,6 +230,16 @@ code{font:13px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--f
 .fr-pick i{position:absolute;left:0;right:0;bottom:0;font:600 12px var(--display);color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent);padding:14px 6px 5px;text-align:left;font-style:normal}
 .fr-ctl{display:flex;gap:4px;flex-wrap:wrap} .fr-ctl .btn{padding:3px 8px;font-size:12px;flex:1}
 @media (max-width:860px){.st-grid{grid-template-columns:minmax(0,1fr)}.st-preview{position:static;order:-1;max-width:340px;margin:0 auto;width:100%}}
+
+/* ===== today card ===== */
+.today{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--note);border-radius:18px;padding:clamp(18px,3vw,28px);display:flex;flex-direction:column;gap:12px}
+.today.t-good{border-left-color:var(--good)} .today.t-watch{border-left-color:var(--watch)}
+.today-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.today-q{font-size:14px;color:var(--muted)}
+.today h2{font-size:clamp(30px,5vw,48px);font-weight:800;font-stretch:118%;letter-spacing:-.02em;line-height:1.02}
+.today-lead{margin:0;font-family:var(--serif);font-size:19px;line-height:1.5}
+.today-tip{margin:0;font-weight:650;font-size:16px}
+.today-f{margin-top:4px}
 </style>
 </head>
 <body>
@@ -747,6 +757,41 @@ function generateInsights(runs, log, today) {
   }
   if (ni.length) sections.push({ title: 'Niggles and load', items: ni });
   return sections;
+}
+
+/* ===== Run or rest today ===== */
+function todayAdvice(runs, log, today) {
+  const C = CONFIG, rs = [...runs].filter(r => r.date <= today).sort((a, b) => a.date < b.date ? -1 : 1);
+  if (!rs.length) return null;
+  const last = rs[rs.length - 1], since = diffDays(last.date, today);
+  const kmIn = (a, b) => rs.filter(r => { const d = diffDays(r.date, today); return d >= a && d < b; }).reduce((s, r) => s + r.dist, 0);
+  const acute = kmIn(0, 7), chronic = kmIn(7, 35) / 4, ratio = chronic >= 3 ? acute / chronic : null;
+  const win30 = rs.filter(r => diffDays(r.date, today) < 30), l30 = win30.length ? Math.max(...win30.map(r => r.dist)) : last.dist;
+  const dates = new Set(rs.map(r => r.date)); let streak = 0; for (let d = last.date; dates.has(d); d = addDays(d, -1)) streak++;
+  const zsum = last.zones ? last.zones.reduce((a, b) => a + b, 0) : 0, hardShare = zsum ? (last.zones[3] + last.zones[4]) / zsum * 100 : null;
+  const pains = (log || []).filter(e => e.pain >= C.niggleMinPain && diffDays(e.date, today) >= 0 && diffDays(e.date, today) <= 7).sort((a, b) => a.date < b.date ? 1 : -1), pain = pains[0] || null, painAge = pain ? diffDays(pain.date, today) : null;
+  const longRuns = win30.filter(r => r.dist >= 0.8 * l30), sinceLong = longRuns.length ? diffDays(longRuns[longRuns.length - 1].date, today) : null;
+  const recent = rs.filter(r => diffDays(r.date, today) < 28).map(r => r.dist).sort((a, b) => a - b), med = recent.length ? recent[Math.floor(recent.length / 2)] : last.dist;
+  const cap = Math.min(C.goalKm, l30 * (1 + C.spikeSmall / 100));
+  const when = since === 0 ? 'today' : since === 1 ? 'yesterday' : `${since} days ago`;
+  const heavy = []; if (last.dist >= 0.75 * l30 && l30 >= 6) heavy.push(`${Math.round(last.dist / l30 * 100)}% of your longest run in the last 30 days`); if (hardShare != null && hardShare >= C.hardShareWatch + 5) heavy.push(`${Math.round(hardShare)}% of it in the hard zones 4 and 5`); if (last.ate != null && last.ate >= 4) heavy.push(`a Garmin aerobic training effect of ${last.ate.toFixed(1)}`);
+  const facts = [['Last run', `${r1(last.dist)} km, ${when}`], ['Run days in a row', String(streak)], ['Last 7 days', `${r1(acute)} km${chronic >= 3 ? `, against ${r1(chronic)} km a week before` : ''}`]];
+  if (last.load != null) facts.push(['Garmin load, last run', String(Math.round(last.load))]);
+  facts.push(['Pain logged, last 7 days', pain ? `${pain.pain} out of 10, ${pain.part || 'unspecified'}, ${diffDays(pain.date, today) === 0 ? 'today' : diffDays(pain.date, today) + ' days ago'}` : 'none']);
+  const out = { facts, ev: 'Practice-based rules of thumb. The 7-day against 4-week comparison has mixed research support; a run more than 10% beyond your longest in 30 days is the better-supported warning (Frandsen et al., Br J Sports Med 2024).' };
+  const set = (verdict, level, lead, why, tip) => Object.assign(out, { verdict, level, lead, why, tip });
+  if (pain && painAge <= 3) set('Rest', 'watch', `You logged pain of ${pain.pain} out of 10 in your ${pain.part || 'body'} ${painAge === 0 ? 'today' : painAge === 1 ? 'yesterday' : painAge + ' days ago'}.`, ['Pain of 3 or more is the clearest signal to stop, ahead of any load number.'], 'Rest today. If it is still there after a few days, or gets worse, see a physiotherapist or sports doctor.');
+  else if (since === 0) set('Done for today', 'good', `You ran ${r1(last.dist)} km today.`, ['One run a day is enough. Recovery is when the running gains are made.'], 'Eat, drink and rest. Check again tomorrow.' + (ratio != null && ratio > 1.3 ? ` Your last 7 days (${r1(acute)} km) are ${Math.round((ratio - 1) * 100)}% above your normal week, so keep the next few days easy.` : ''));
+  else if (streak >= 3 && since <= 1) set('Rest', 'watch', `You have run ${streak} days in a row.`, ['Three or more days in a row leaves little time for tendons and bone to recover.'], 'Take a full rest day, or a gentle walk.');
+  else if (since === 1 && heavy.length) set('Rest', 'watch', `Yesterday's run was hard on the body: ${heavy.join(' and ')}.`, ['A big or hard run needs a day before the next one, which is also why your long runs spread out over the week.'], 'Rest, or a short easy walk. Run again tomorrow if you feel fresh.');
+  else if (ratio != null && ratio > 1.5) set('Easy only', 'watch', `The last 7 days (${r1(acute)} km) are ${Math.round((ratio - 1) * 100)}% above your normal week (${r1(chronic)} km).`, ['A fast rise in weekly load is where many overuse injuries begin. Mixed evidence, but a sensible warning.'], 'Rest, or a short, truly easy run of 3 to 5 km.');
+  else if (ratio != null && ratio > 1.3) set('Easy only', 'note', `The last 7 days (${r1(acute)} km) are ${Math.round((ratio - 1) * 100)}% above your normal week (${r1(chronic)} km).`, ['Load is climbing a bit fast. Easy running is fine; skip anything hard.'], `Easy run, around ${r1(Math.min(med, 6))} km or less, at a pace you can talk at.`);
+  else if (pain) set('Easy only', 'note', `You logged pain of ${pain.pain} out of 10 in your ${pain.part || 'body'} ${painAge} days ago.`, ['It is recent. Easy running is reasonable if it has settled; stop at once if it returns.'], `Easy run, ${r1(Math.min(med, 6))} km or less, and stop if the pain comes back.`);
+  else if (since === 1) set('Easy run or rest', 'note', `You ran ${r1(last.dist)} km yesterday, a moderate effort.`, ['Back-to-back runs are fine when yesterday was moderate. Keep today easy and short.'], `Either rest, or an easy run of about ${r1(Math.min(med, 6))} km.`);
+  else if (since >= 14) set('Good to run, ease back in', 'good', `Your last run was ${since} days ago.`, ['After a break, fitness is lower than the watch remembers. Rebuild before you push.'], `Easy run, about ${r1(Math.max(2, med * 0.7))} km. Add distance gradually over the next two weeks.`);
+  else if (sinceLong != null && sinceLong >= 7) set('Good to run', 'good', `You are rested (last run ${when}) and your last long run was ${sinceLong} days ago.`, ['A weekly long run is the base of half-marathon training. Stay within 10% of your longest run in the last 30 days.'], `Long-run day: up to ${r1(cap)} km, at an easy pace. Or a shorter easy run if you do not feel fresh.`);
+  else set('Good to run', 'good', `You are rested: your last run was ${when} and nothing in your recent load or niggle log says otherwise.`, ['Nothing here calls for rest.'], `Easy run, around ${r1(Math.max(2, med * 0.85))} to ${r1(med * 1.15)} km.`);
+  return out;
 }
 
 /* ===== Share card helpers ===== */
@@ -1298,7 +1343,7 @@ if __name__ == "__main__":
       <div class="cover-cta"><a class="btn primary" href="${esc(P.url)}" target="_blank" rel="noopener">Follow ${esc(P.handle)}</a><button class="btn ghost" type="button" data-go="progress">See the training data</button></div></div>`;
     $('#storyStats').innerHTML = [['Runs logged', String(n), ''], ['Distance run', String(Math.round(km)), 'km'], ['Longest run', r1(lg).toFixed(1), 'km']].map(x => `<div><dt>${x[0]}</dt><dd>${x[1]}${x[2] ? `<small>${x[2]}</small>` : ''}</dd></div>`).join('');
     $('#storyText').innerHTML = `<h2>The story so far</h2>${P.story.map(t => `<p>${esc(t)}</p>`).join('')}<p class="muted">Every chart on this site comes from my own Garmin runs, read against what running research says about building up safely.</p>`;
-    $('#gallery').innerHTML = P.photos.map((p, i) => `<figure class="g${i + 1}"><img src="${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="object-position:${esc(p.pos || '50% 50%')}"><figcaption>${esc(p.cap)}</figcaption></figure>`).join('');
+    $('#gallery').innerHTML = P.photos.map((p, i) => `<figure class="g${i + 1}"><img src="${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="object-position:${esc(p.pos || '50% 50%')}">${p.cap ? `<figcaption>${esc(p.cap)}</figcaption>` : ''}</figure>`).join('');
     $('#follow').innerHTML = `<img src="photos/qr-instagram.svg" alt="QR code for ${esc(P.handle)} on Instagram" width="132" height="132"><div><h2>Follow the build-up</h2><p>Run photos, race days and the numbers behind them, on Instagram.</p><a class="btn primary" href="${esc(P.url)}" target="_blank" rel="noopener">${esc(P.handle)}</a></div>`;
     $('#storyFoot').innerHTML = esc('Training notes from my own data, not medical advice. If pain lasts or gets worse, see a physiotherapist or sports doctor.') + (OWNER ? ' <a href="?me=off">Owner mode is on. Switch off.</a>' : '');
     $('#igTop').href = P.url;
@@ -1378,11 +1423,35 @@ if __name__ == "__main__":
       facts: [['Latest run', fmt(latest)], ['28-day average', a != null ? fmt(a) : 'none'], ['Ideal', spec.idealFact, 'ideal']], read: out.join(' '), why: spec.why, ev: spec.ev }),
       draw: () => lineChart('ch-' + spec.k, d.map(r => niceDate(r.date)), vals.map(v => v == null ? null : +v.toFixed(3)), { name: spec.title, band: spec.ideal ? { lo: spec.ideal[0], hi: spec.ideal[1], label: spec.bandLabel } : null, tip: c => `${spec.fmt(c.parsed.y)} ${spec.unit}` }) };
   }
+  /* Numbers for one 28-day window: pace, heart rate, run length, temperature. */
+  function winStats(rs) {
+    const hrs = rs.map(r => r.hr).filter(v => v), tmp = rs.map(r => { const m = r.weather && /(-?\d+)\s*°\s*C/.exec(r.weather); return m ? +m[1] : null; }).filter(v => v != null);
+    return { n: rs.length, pace: rs.length ? poolPace(rs) : null, hr: hrs.length ? mean(hrs) : null, km: rs.length ? mean(rs.map(r => r.dist)) : null, temp: tmp.length >= 2 ? mean(tmp) : null, eff: avgOf(rs, effRun) };
+  }
+  const sgn = v => (v >= 0 ? '+' : '−') + Math.abs(v);
+  /* Compares the last 28 days with the 28 before and says what the pace change means, using heart rate. */
+  function paceVerdict(a, b) {
+    const C = CONFIG, dp = b.pace - a.pace, out = { level: 'note', read: '', lines: [] };         // dp > 0: faster now
+    out.lines.push(`Last 28 days: ${fmtPace(a.pace)} /km over ${a.n} runs. The 28 days before: ${fmtPace(b.pace)} /km over ${b.n} runs. That is ${Math.abs(Math.round(dp)) <= C.paceChangeSec ? 'about the same' : Math.round(Math.abs(dp)) + ' seconds per km ' + (dp > 0 ? 'faster' : 'slower')}.`);
+    if (a.hr == null || b.hr == null) { out.lines.push('One of the two periods has no heart-rate data, so I cannot tell whether the change was effort or fitness.'); return out; }
+    const dh = a.hr - b.hr, dEff = a.eff != null && b.eff != null ? (a.eff / b.eff - 1) * 100 : null;
+    out.lines.push(`Average heart rate: ${Math.round(a.hr)} against ${Math.round(b.hr)} bpm (${sgn(Math.round(dh))}).${dEff != null ? ` Metres per heartbeat: ${a.eff.toFixed(2)} against ${b.eff.toFixed(2)} (${sgn(r1(dEff))}%).` : ''}`);
+    if (a.km && b.km && Math.abs(a.km / b.km - 1) > .2) out.lines.push(`Your average run was ${r1(a.km)} km against ${r1(b.km)} km before, and longer runs are naturally slower.`);
+    if (a.temp != null && b.temp != null && Math.abs(a.temp - b.temp) >= 3) out.lines.push(`Runs averaged ${Math.round(a.temp)}°C against ${Math.round(b.temp)}°C, and heat alone raises heart rate and slows pace.`);
+    const slower = dp < -C.paceChangeSec, faster = dp > C.paceChangeSec, hrUp = dh >= 3, hrDown = dh <= -3;
+    if (slower && hrDown) { out.level = 'good'; out.read = 'Slower at a lower heart rate: you ran easier. That is what building an aerobic base looks like.'; }
+    else if (slower && !hrDown) { out.level = 'watch'; out.read = `Slower without a lower heart rate: ${hrUp ? 'the same effort is now buying less speed' : 'effort is unchanged but speed fell'}. Longer runs, heat, tiredness or a recent hard week can all do this. If it lasts beyond another two weeks, take an easier week.`; }
+    else if (faster && hrUp) { out.level = 'note'; out.read = 'Faster at a higher heart rate: you are running harder, not yet fitter. Check that easy runs are still easy.'; }
+    else if (faster) { out.level = 'good'; out.read = 'Faster at the same or lower heart rate. That is a real fitness gain.'; }
+    else if (hrDown) { out.level = 'good'; out.read = 'Same pace at a lower heart rate: you are fitter.'; }
+    else { out.level = 'good'; out.read = hrUp ? 'Same pace at a higher heart rate: effort has crept up. Watch whether it keeps rising.' : 'Pace and heart rate are both steady.'; }
+    return out;
+  }
   function paceBlock(d) {
     const vals = d.map(r => r.pace), have = vals.filter(v => v), latest = have[have.length - 1]; if (have.length < 2) return null;
-    const rec = L28(d), pri = P28(d), pa = rec.length ? poolPace(rec) : null, pb = pri.length ? poolPace(pri) : null; let level = 'note', read;
-    if (pa && pb) { const diff = pb - pa; if (diff > CONFIG.paceChangeSec) { level = 'good'; read = `Your last 28 days average ${fmtPace(pa)}/km, ${Math.round(diff)} seconds per km faster than the 28 days before (${fmtPace(pb)}).`; } else if (diff < -CONFIG.paceChangeSec) read = `Your last 28 days average ${fmtPace(pa)}/km, ${Math.round(-diff)} seconds per km slower than the 28 days before (${fmtPace(pb)}). That is common during a build, and it only matters if heart rate is rising too.`; else { level = 'good'; read = `Your last 28 days average ${fmtPace(pa)}/km, close to the 28 days before (${fmtPace(pb)}). Steady pace while distance grows is what a build should look like.`; } }
-    else read = pa ? `Your last 28 days average ${fmtPace(pa)}/km.` : `No runs in the last 28 days. Your latest was ${fmtPace(latest)}/km.`;
+    const rec = L28(d), pri = P28(d), pa = rec.length ? poolPace(rec) : null; let level = 'note', read;
+    if (rec.length && pri.length) { const v = paceVerdict(winStats(rec), winStats(pri)); level = v.level; read = v.lines.join(' ') + (v.read ? ' ' + v.read : ''); }
+    else read = pa ? `Your last 28 days average ${fmtPace(pa)}/km. There are no runs in the 28 days before, so there is nothing to compare yet.` : `No runs in the last 28 days. Your latest was ${fmtPace(latest)}/km.`;
     const m = vals.map(v => v ? v / 60 : null);
     return { level, html: blk({ id: 'ch-pace', title: 'Pace', sub: 'Minutes per km for each run, with a 3-run average. Lower is faster', level, aria: `Pace per run, latest ${fmtPace(latest)} per km`,
       facts: [['Latest run', fmtPace(latest) + ' /km'], ['28-day average', pa ? fmtPace(pa) + ' /km' : 'none'], ['Ideal', 'Faster at the same effort', 'ideal']], read,
@@ -1392,8 +1461,15 @@ if __name__ == "__main__":
   function effBlock(d) {
     const get = r => { const v = effRun(r); return v == null ? null : v; }, vals = d.map(get), have = vals.filter(v => v != null); if (have.length < 2) return null;
     const rec = L28(d), pri = P28(d), a = avgOf(rec, get), b = avgOf(pri, get), latest = have[have.length - 1]; let level = 'note', read;
-    if (a != null && b != null) { const c = (a / b - 1) * 100; if (c > CONFIG.effChangePct) { level = 'good'; read = `Up ${r1(c)}% on the 28 days before: ${a.toFixed(2)} metres per heartbeat against ${b.toFixed(2)}. You are covering more ground for the same heart rate.`; } else if (c < -CONFIG.effChangePct) { level = 'watch'; read = `Down ${r1(-c)}% on the 28 days before: ${a.toFixed(2)} metres per heartbeat against ${b.toFixed(2)}. Heat, poor sleep and a hard week all lower it, so look for a pattern before worrying.`; } else { level = 'good'; read = `About the same as the 28 days before (${a.toFixed(2)} against ${b.toFixed(2)} metres per heartbeat). Gains here are slow, so a flat line over a few weeks is normal.`; } }
+    if (a != null && b != null) { const c = (a / b - 1) * 100; if (c > CONFIG.effChangePct) { level = 'good'; read = `Up ${r1(c)}% on the 28 days before: ${a.toFixed(2)} metres per heartbeat against ${b.toFixed(2)}. You are covering more ground for the same heart rate.`; } else if (c < -CONFIG.effChangePct) { level = 'watch'; read = `Down ${r1(-c)}% on the 28 days before: ${a.toFixed(2)} metres per heartbeat against ${b.toFixed(2)}.`; } else { level = 'good'; read = `About the same as the 28 days before (${a.toFixed(2)} against ${b.toFixed(2)} metres per heartbeat). Gains here are slow, so a flat line over a few weeks is normal.`; } }
     else read = a != null ? `Over the last 28 days you averaged ${a.toFixed(2)} metres per heartbeat.` : `No runs in the last 28 days. Your latest was ${latest.toFixed(2)} metres per heartbeat.`;
+    if (rec.length && pri.length && b != null && a != null) {
+      const A = winStats(rec), B = winStats(pri);
+      if (A.hr != null && B.hr != null && A.pace && B.pace) {
+        read += ` Behind it: pace ${fmtPace(A.pace)} against ${fmtPace(B.pace)} /km, heart rate ${Math.round(A.hr)} against ${Math.round(B.hr)} bpm.${A.temp != null && B.temp != null && Math.abs(A.temp - B.temp) >= 3 ? ` Runs averaged ${Math.round(A.temp)}°C against ${Math.round(B.temp)}°C.` : ''}`;
+        if (level === 'watch' && A.hr <= B.hr - 3 && A.pace > B.pace) { level = 'note'; read += ' Most of the drop comes from running easier: a slower pace at a lower heart rate always lowers this number, so it is not a sign of lost fitness. Compare runs at a similar heart rate instead.'; }
+      }
+    }
     return { level, html: blk({ id: 'ch-eff', title: 'Heart-rate efficiency', sub: 'Metres covered per heartbeat, for each run', level, aria: `Efficiency per run, latest ${latest.toFixed(2)} metres per beat`,
       facts: [['Latest run', latest.toFixed(2) + ' m/beat'], ['28-day average', a != null ? a.toFixed(2) + ' m/beat' : 'none'], ['Ideal', 'Rising over months', 'ideal']], read,
       why: 'Metres per heartbeat is a simple fitness marker. When it rises you are going faster for the same effort, or the same speed at a lower heart rate. Heat, poor sleep and illness lower it temporarily.', ev: 'practice-based' }),
@@ -1448,12 +1524,21 @@ if __name__ == "__main__":
     const ok = blocks.filter(Boolean); if (!ok.length) return { html: '', draws: [] };
     return { html: `<section class="sec"><div class="sec-h"><h2>${esc(title)}</h2><p>${esc(blurb)}</p></div><div class="blocks">${ok.map(b => b.html).join('')}</div></section>`, draws: ok.map(b => b.draw) };
   }
+  function todayCard() {
+    if (!OWNER || isExample()) return '';
+    const a = todayAdvice(data(), S.log, today); if (!a) return '';
+    return `<section class="today t-${a.level}" aria-label="Run or rest today"><div class="today-h"><div><span class="today-q">Today</span><h2>${esc(a.verdict)}</h2></div><span class="st st-${a.level}">${IC[a.level]}${ST_WORD[a.level]}</span></div>
+      <p class="today-lead">${esc(a.lead)}</p><p class="today-tip">${esc(a.tip)}</p>
+      <dl class="facts today-f">${a.facts.map(f => `<div><dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd></div>`).join('')}</dl>
+      <p class="why"><b>Why.</b> ${esc(a.why.join(' '))} <span class="evd">Evidence: ${esc(a.ev)}</span></p>
+      <p class="why">This only sees your run history. Sleep, HRV and how you feel are not in it, so check your watch's Training Readiness too, and trust your body over this card.</p></section>`;
+  }
   function renderProgress() {
     const d = data(), secs = [
       section('Distance', 'How much you run, and how far the long run has grown.', [weeklyBlock(d), longestBlock(d)]),
       section('Pace and effort', 'Whether you are getting fitter without running harder.', [paceBlock(d), effBlock(d), zonesBlock(d)]),
       section('Running form', 'Small mechanics that change with fatigue and fitness. Each shows your reading against a reference range where one exists.', SPECS.map(s => metricBlock(s, d)))];
-    $('#progressBody').innerHTML = `<div style="display:flex;flex-direction:column;gap:56px">${secs.map(s => s.html).join('')}<p class="foot">Pattern observations from your own numbers, not medical advice. Reference ranges are rules of thumb, not limits set for you. If pain lasts or gets worse, see a physiotherapist or sports doctor.</p></div>`;
+    $('#progressBody').innerHTML = `<div style="display:flex;flex-direction:column;gap:56px">${todayCard()}${secs.map(s => s.html).join('')}<p class="foot">Pattern observations from your own numbers, not medical advice. Reference ranges are rules of thumb, not limits set for you. If pain lasts or gets worse, see a physiotherapist or sports doctor.</p></div>`;
     secs.forEach(s => s.draws.forEach(f => f()));
   }
 
