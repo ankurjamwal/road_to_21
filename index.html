@@ -204,6 +204,32 @@ code{font:13px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--f
  .g1{grid-column:1 / span 1;grid-row:span 2;aspect-ratio:3/4}.g2,.g3{grid-column:2 / span 1;aspect-ratio:1}
 }
 @media (max-width:520px){.stats{gap:8px}.top-r .ig span{display:none}}
+
+/* ===== instagram story ===== */
+.st-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:28px;align-items:start}
+.st-controls{display:flex;flex-direction:column;gap:16px;min-width:0}
+.st-controls .field{margin-top:8px} .st-controls h3{font-size:17px;margin-bottom:6px}
+.st-controls input[type=text],.st-controls select{width:100%}
+.st-preview{position:sticky;top:12px}
+.st-phone{position:relative;border-radius:22px;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,.18);aspect-ratio:9/16}
+.st-phone canvas{display:block;width:100%;height:100%}
+.st-zone{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;font:600 13px var(--display);color:#fff;background:rgba(235,60,60,.34);border:2px dashed rgba(255,255,255,.75)}
+.st-top{top:0;height:13.02%} .st-bot{bottom:0;height:17.7%}
+.st-zone[hidden]{display:none}
+.seg{display:flex;gap:4px;background:var(--faint);padding:4px;border-radius:12px;margin-top:6px}
+.seg label{flex:1;cursor:pointer} .seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;text-align:center;padding:9px 6px;border-radius:9px;font:600 14px var(--display);color:var(--muted)}
+.seg input:checked+span{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:10px;cursor:pointer} .check input{margin-top:3px}
+.frames{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;margin-top:6px}
+.fr{flex:none;width:92px;display:flex;flex-direction:column;gap:6px}
+.fr-pick{appearance:none;border:2px solid transparent;border-radius:12px;padding:0;overflow:hidden;position:relative;width:92px;height:150px;background:var(--faint);cursor:pointer}
+.fr.on .fr-pick{border-color:var(--accent)}
+.fr-pick img,.fr-pick video{width:100%;height:100%;object-fit:cover;display:block}
+.fr-pick i{position:absolute;left:0;right:0;bottom:0;font:600 12px var(--display);color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent);padding:14px 6px 5px;text-align:left;font-style:normal}
+.fr-ctl{display:flex;gap:4px;flex-wrap:wrap} .fr-ctl .btn{padding:3px 8px;font-size:12px;flex:1}
+@media (max-width:860px){.st-grid{grid-template-columns:minmax(0,1fr)}.st-preview{position:static;order:-1;max-width:340px;margin:0 auto;width:100%}}
 </style>
 </head>
 <body>
@@ -260,26 +286,61 @@ code{font:13px ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--f
 
   <!-- Share -->
   <section class="panel" id="p-share" role="tabpanel" aria-labelledby="t-share" hidden>
-    <div class="share-grid">
-      <div class="card">
-        <h2>Instagram card</h2>
-        <p class="cap">Turns a photo into a square 1080 by 1080 picture with your run on it. Everything happens in this browser; the photo is not uploaded anywhere.</p>
-        <div class="field"><label class="label" for="shPhoto">Photo</label><input type="file" id="shPhoto" accept="image/*"></div>
-        <div class="row">
-          <div class="field" style="flex:1 1 120px"><label class="label" for="shX">Crop left to right</label><input type="range" id="shX" min="0" max="100" value="50"></div>
-          <div class="field" style="flex:1 1 120px"><label class="label" for="shY">Crop top to bottom</label><input type="range" id="shY" min="0" max="100" value="50"></div>
+    <div class="panel-head"><h2>Instagram story</h2></div>
+    <div class="st-grid">
+      <div class="st-controls">
+        <div class="card">
+          <h3>1. Photos and videos</h3>
+          <p class="cap">Add one or more. Each becomes its own 1080 by 1920 story frame, ready to post as a carousel. Everything happens in this browser; nothing is uploaded.</p>
+          <div class="field"><label class="label" for="stFiles">Add photos or short videos</label><input type="file" id="stFiles" accept="image/*,video/*" multiple></div>
+          <div id="stFrames" class="frames" aria-label="Story frames"></div>
+          <div id="stCrop">
+            <div class="row">
+              <div class="field" style="flex:1 1 110px"><label class="label" for="stX">Move left or right</label><input type="range" id="stX" min="0" max="100" value="50"></div>
+              <div class="field" style="flex:1 1 110px"><label class="label" for="stY">Move up or down</label><input type="range" id="stY" min="0" max="100" value="40"></div>
+              <div class="field" style="flex:1 1 110px"><label class="label" for="stZ">Zoom</label><input type="range" id="stZ" min="100" max="250" value="100"></div>
+            </div>
+          </div>
         </div>
-        <div class="field"><label class="label" for="shRun">Run</label><select id="shRun"></select></div>
-        <div class="field"><label class="label" for="shGpx">Route file (GPX, optional)</label><input type="file" id="shGpx" accept=".gpx,application/gpx+xml,text/xml,application/xml">
-          <p class="cap">In Garmin Connect on the web, open the run, use the gear menu and choose Export to GPX. Not needed for runs loaded through the Garmin script, which carry their own route. The route is drawn as a clean outline, not a street map.</p></div>
-        <div class="field"><label class="label" for="shLoc">Location</label><input type="text" id="shLoc" maxlength="60" placeholder="Dehradun, India"></div>
-        <div class="field"><label class="label" for="shWx">Weather during the run</label><input type="text" id="shWx" maxlength="40" placeholder="Clear, 24°C">
-          <p class="cap">Filled in for runs loaded through the Garmin script; otherwise type it. You can always edit it.</p></div>
-        <div class="field"><label class="label" for="shText">Progress and goal</label><textarea id="shText" maxlength="240"></textarea></div>
-        <div class="row" style="margin-top:12px"><button class="btn primary" id="shSave" type="button">Download picture</button><button class="btn" id="shReset" type="button">Reset text</button></div>
-        <p class="cap" id="shMsg" role="status"></p>
+        <div class="card">
+          <h3>2. Layout</h3>
+          <div class="seg" role="radiogroup" aria-label="Layout">
+            <label><input type="radio" name="stLayout" value="poster" checked><span>Poster</span></label>
+            <label><input type="radio" name="stLayout" value="route"><span>Route first</span></label>
+            <label><input type="radio" name="stLayout" value="strip"><span>Stat strip</span></label>
+          </div>
+          <p class="cap" id="stLayoutNote">Photo fills the frame, with the big distance and your details low down.</p>
+          <div class="field"><label class="label" for="stProgMode">Progress line</label>
+            <select id="stProgMode"><option value="first">On the first frame only</option><option value="all">On every frame</option><option value="none">Hide it</option></select></div>
+        </div>
+        <div class="card">
+          <h3>3. Run details</h3>
+          <div class="field"><label class="label" for="stRun">Run</label><select id="stRun"></select></div>
+          <div class="field"><label class="label" for="stGpx">Route file (GPX, optional)</label><input type="file" id="stGpx" accept=".gpx,application/gpx+xml,text/xml,application/xml">
+            <p class="cap">Not needed for runs loaded through the Garmin script, which carry their own route. The route is drawn as a clean outline, not a street map.</p></div>
+          <label class="check"><input type="checkbox" id="stHide" checked> Hide the first and last 200 m of the route, so home is not pinpointed</label>
+          <div class="field"><label class="label" for="stLoc">Location</label><input type="text" id="stLoc" maxlength="60" placeholder="Bengaluru, India"></div>
+          <div class="field"><label class="label" for="stWx">Weather during the run</label><input type="text" id="stWx" maxlength="40" placeholder="Clear, 24°C"></div>
+          <div class="field"><label class="label" for="stProg">Progress line text</label><input type="text" id="stProg" maxlength="80"></div>
+        </div>
+        <div class="card">
+          <h3>4. Save</h3>
+          <div class="row">
+            <button class="btn primary" id="stSave" type="button">Save this frame</button>
+            <button class="btn" id="stSaveAll" type="button">Save all photo frames</button>
+            <button class="btn" id="stShare" type="button" hidden>Share…</button>
+          </div>
+          <div class="row" id="stVideoOpts" hidden style="margin-top:10px">
+            <div class="field"><label class="label" for="stSecs">Video length</label><select id="stSecs"><option value="10">10 seconds</option><option value="15" selected>15 seconds</option><option value="30">30 seconds</option></select></div>
+            <label class="check" style="align-self:end"><input type="checkbox" id="stMute"> Mute the sound</label>
+          </div>
+          <p class="cap" id="stMsg" role="status"></p>
+        </div>
       </div>
-      <div class="card"><canvas id="shCanvas" width="1080" height="1080" role="img" aria-label="Preview of the Instagram card"></canvas><p class="cap">Preview. Until you add a photo the background is plain.</p></div>
+      <div class="st-preview">
+        <div class="st-phone"><canvas id="stCanvas" width="1080" height="1920" role="img" aria-label="Preview of the Instagram story frame"></canvas><div class="st-zone st-top" hidden>Instagram covers this</div><div class="st-zone st-bot" hidden>Instagram covers this</div></div>
+        <div class="row" style="justify-content:center;margin-top:10px"><button class="btn small" id="stPlay" type="button" hidden>Play video</button><label class="check"><input type="checkbox" id="stSafe"> Show unsafe areas</label></div>
+      </div>
     </div>
   </section>
 
@@ -768,7 +829,7 @@ function exampleRuns(today) {
   const PORTFOLIO = {
     handle: '@midlife.cardio', url: 'https://www.instagram.com/midlife.cardio/',
     lead: 'Running in midlife, one honest run at a time. I am training for a half marathon, 21.1 km, without getting injured, and sharing the real numbers as I go.',
-    story: ['I have been running for about two years, at least twice a week.',
+    story: ['I have been running for about two years, at least twice a week. In August 2026 I got a Garmin and started reading my numbers properly: pace, heart rate, cadence and how fast I build distance.',
             'This page keeps that record next to the race days that make it worth it. The plan is simple: 21.1 km, injury-free, within a year.'],
     cover: { src: 'photos/cover.jpg', alt: 'A runner with both arms raised in victory signs among other runners at a Wipro marathon' },
     photos: [
@@ -779,6 +840,15 @@ function exampleRuns(today) {
     // Summary shown to visitors who have not loaded their own data. Edit or remove.
     snapshot: { runs: 31, km: 146.8, longest: 12.1, since: '2026-08-12' }
   };
+  /* Owner mode: open the page once with ?me on the end of the address to switch your tools on in this browser.
+     ?me=off switches them off again. Visitors only see Story and Progress. This is tidiness, not security. */
+  const OWNER = (() => { try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('me')) { if (['off', '0', 'false'].includes(q.get('me'))) localStorage.removeItem('road21.owner'); else localStorage.setItem('road21.owner', '1'); }
+    return localStorage.getItem('road21.owner') === '1';
+  } catch (e) { return false; } })();
+  const PUBLIC_TABS = ['story', 'progress'];
+  if (!OWNER) ['detail', 'insights', 'share', 'log', 'data'].forEach(t => { const b = document.getElementById('t-' + t); if (b) b.hidden = true; });
   const byDate = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
   const isExample = () => S.runs.length === 0;
   const data = () => (S.runs.length ? S.runs : exampleRuns(today)).slice().sort(byDate);
@@ -1132,6 +1202,7 @@ if __name__ == "__main__":
 
   /* ---------- tabs ---------- */
   function setTab(t) {
+    if (!OWNER && !PUBLIC_TABS.includes(t)) t = 'story';
     S.tab = t;
     document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
     for (const p of ['story', 'progress', 'detail', 'insights', 'share', 'log', 'data']) $('#p-' + p).hidden = p !== t;
@@ -1178,7 +1249,8 @@ if __name__ == "__main__":
   function renderBanner() {
     let h = '';
     if (S.tab === 'story') { $('#banner').innerHTML = ''; return; }
-    if (isExample()) h += `<div class="banner"><span><b>Example data.</b> These are made-up runs showing what the page does. Add your own to replace them.</span><button class="btn small" data-go="data" type="button">Add my runs</button></div>`;
+    if (isExample() && !OWNER) h += `<div class="banner"><span><b>Example data.</b> These charts use made-up runs to show how this page reads training data. My real data stays private.</span></div>`;
+    else if (isExample()) h += `<div class="banner"><span><b>Example data.</b> These are made-up runs showing what the page does. Add your own to replace them.</span><button class="btn small" data-go="data" type="button">Add my runs</button></div>`;
     if (!isExample()) h += `<div class="banner"><span>Your history is saved in this browser on this device only. Use <b>Back up</b> on the Data tab to keep a copy or move to another device.</span><button class="btn small" data-go="data" type="button">Back up</button></div>`;
     if (S.notice) h += `<div class="banner" role="status"><span>${esc(S.notice)}</span></div>`;
     $('#banner').innerHTML = h;
@@ -1196,7 +1268,7 @@ if __name__ == "__main__":
     $('#storyText').innerHTML = `<h2>The story so far</h2>${P.story.map(t => `<p>${esc(t)}</p>`).join('')}<p class="muted">Every chart on this site comes from my own Garmin runs, read against what running research says about building up safely.</p>`;
     $('#gallery').innerHTML = P.photos.map((p, i) => `<figure class="g${i + 1}"><img src="${esc(p.src)}" alt="${esc(p.alt)}" loading="lazy" style="object-position:${esc(p.pos || '50% 50%')}"><figcaption>${esc(p.cap)}</figcaption></figure>`).join('');
     $('#follow').innerHTML = `<img src="photos/qr-instagram.svg" alt="QR code for ${esc(P.handle)} on Instagram" width="132" height="132"><div><h2>Follow the build-up</h2><p>Run photos, race days and the numbers behind them, on Instagram.</p><a class="btn primary" href="${esc(P.url)}" target="_blank" rel="noopener">${esc(P.handle)}</a></div>`;
-    $('#storyFoot').textContent = 'Training notes from my own data, not medical advice. If pain lasts or gets worse, see a physiotherapist or sports doctor.';
+    $('#storyFoot').innerHTML = esc('Training notes from my own data, not medical advice. If pain lasts or gets worse, see a physiotherapist or sports doctor.') + (OWNER ? ' <a href="?me=off">Owner mode is on. Switch off.</a>' : '');
     $('#igTop').href = P.url;
   }
 
@@ -1530,106 +1602,212 @@ if __name__ == "__main__":
     catch (e) { const r = document.createRange(); r.selectNodeContents($('#scriptBox')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); $('#copyMsg').textContent = 'Selected. Press Ctrl+C to copy.'; }
   });
 
-  /* ---------- share card ---------- */
-  const SH = { img: null, url: null, route: null, edited: false, locEdited: false, wxEdited: false, optKey: '', tok: 0, raf: 0 };
+  /* ---------- instagram story ---------- */
+  const ST = { frames: [], sel: 0, route: null, progEdited: false, locEdited: false, wxEdited: false, optKey: '', tok: 0, playing: false, busy: false, off: null, mid: null };
+  const SW = 1080, SHT = 1920, F = '"Archivo Variable", "Segoe UI", system-ui, sans-serif', STORY_MAX = 10;
+  const stRuns = () => data().slice().sort(byDate).reverse();
+  const stRun = () => stRuns().find(r => r.id === $('#stRun').value) || stRuns()[0];
+  const stOpts = () => ({ layout: (document.querySelector('input[name=stLayout]:checked') || {}).value || 'poster', prog: $('#stProgMode').value, hide: $('#stHide').checked, loc: $('#stLoc').value.trim(), wx: $('#stWx').value.trim(), progText: $('#stProg').value.trim(), mute: $('#stMute').checked, secs: +$('#stSecs').value });
+  const stLongest = () => { const d = data(); return d.length ? Math.max(...d.map(r => r.dist)) : 0; };
   function saveBlob(blob, name) { const a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
-  const shRuns = () => data().slice().sort(byDate).reverse();
-  function wrapText(c, text, maxW) {
-    const out = [];
-    for (const para of text.split('\n')) {
-      let line = '';
-      for (const w of para.split(/\s+/).filter(Boolean)) { const t = line ? line + ' ' + w : w; if (c.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
-      if (line) out.push(line);
-    }
-    return out;
-  }
   function rrect(c, x, y, w, h, r) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
+  /* Drops the first and last m metres of a track. */
+  function trimRoute(pts, m) {
+    if (!pts || pts.length < 8) return pts;
+    const R = 6371000, rad = Math.PI / 180, cum = [0];
+    for (let i = 1; i < pts.length; i++) { const [a, b] = pts[i - 1], [c, e] = pts[i], h = Math.sin((c - a) * rad / 2) ** 2 + Math.cos(a * rad) * Math.cos(c * rad) * Math.sin((e - b) * rad / 2) ** 2; cum.push(cum[i - 1] + 2 * R * Math.asin(Math.sqrt(h))); }
+    const total = cum[cum.length - 1]; if (total < 4 * m) return pts;
+    const out = pts.filter((_, i) => cum[i] >= m && cum[i] <= total - m); return out.length >= 2 ? out : pts;
+  }
+  const mediaSize = f => f.kind === 'video' ? [f.el.videoWidth, f.el.videoHeight] : [f.el.naturalWidth, f.el.naturalHeight];
+  function drawCover(c, f, x, y, w, h) {
+    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+    const sz = f ? mediaSize(f) : [0, 0];
+    if (!f || !sz[0]) { const g = c.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#12333D'); g.addColorStop(1, '#0B1A21'); c.fillStyle = g; c.fillRect(x, y, w, h); }
+    else { const sc = Math.max(w / sz[0], h / sz[1]) * f.zoom, dw = sz[0] * sc, dh = sz[1] * sc; c.drawImage(f.el, x - (dw - w) * f.x / 100, y - (dh - h) * f.y / 100, dw, dh); }
+    c.restore();
+  }
+  /* Safari has no canvas blur filter, so the frame is shrunk and enlarged in steps instead. */
+  function drawBlurred(c, f) {
+    if (!ST.off) { ST.off = document.createElement('canvas'); ST.off.width = 36; ST.off.height = 64; ST.mid = document.createElement('canvas'); ST.mid.width = 216; ST.mid.height = 384; }
+    const o = ST.off.getContext('2d'), m = ST.mid.getContext('2d'); drawCover(o, f, 0, 0, 36, 64);
+    m.imageSmoothingEnabled = true; m.imageSmoothingQuality = 'high'; m.drawImage(ST.off, 0, 0, 216, 384);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(ST.mid, 0, 0, SW, SHT);
+  }
+  function fade(c, stops, y0, y1) { const g = c.createLinearGradient(0, y0, 0, y1); stops.forEach(s => g.addColorStop(s[0], s[1])); c.fillStyle = g; c.fillRect(0, Math.min(y0, y1), SW, Math.abs(y1 - y0)); }
+  function drawRoute(c, pts, x, y, w, h, pad, lw) {
+    const xy = routeToXY(pts, w, h, pad, 600);
+    c.save(); c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 14; c.beginPath(); xy.forEach((p, i) => i ? c.lineTo(x + p[0], y + p[1]) : c.moveTo(x + p[0], y + p[1]));
+    c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = lw; c.strokeStyle = '#fff'; c.stroke(); c.restore();
+  }
+  function fitLine(c, text, weight, px, x, y) { let p = px; c.font = `${weight} ${p}px ${F}`; while (p > 24 && c.measureText(text).width > SW - 128) { p -= 2; c.font = `${weight} ${p}px ${F}`; } c.fillText(text, x, y); }
+  function statRow(c, items, x, baseY, numPx) {
+    c.textAlign = 'left'; let cx = x;
+    for (const [v, l] of items) { c.font = `800 ${numPx}px ${F}`; const w1 = c.measureText(v).width; c.fillText(v, cx, baseY - 46); c.font = `500 34px ${F}`; const w2 = c.measureText(l).width; c.fillText(l, cx, baseY); cx += Math.max(w1, w2) + 56; }
+  }
+  function drawStory(c, f, run, o, idx, route) {
+    const goal = CONFIG.goalKm, showProg = o.prog === 'all' || (o.prog === 'first' && idx === 0), ratio = Math.min(1, stLongest() / goal);
+    const date = run ? niceDate(run.date) + ' ' + run.date.slice(0, 4) : '', km = run ? r1(run.dist).toFixed(1) : '0.0';
+    const pace = run ? fmtPace(run.pace) : '–', hr = run && run.hr ? Math.round(run.hr) : null, time = run ? fmtDur(run.dur) : '–';
+    c.clearRect(0, 0, SW, SHT); c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+    if (o.layout === 'route') { drawBlurred(c, f); c.fillStyle = 'rgba(6,14,20,.55)'; c.fillRect(0, 0, SW, SHT); } else drawCover(c, f, 0, 0, SW, SHT);
+    if (o.layout === 'poster') { fade(c, [[0, 'rgba(6,14,20,.96)'], [.3, 'rgba(6,14,20,.82)'], [1, 'rgba(6,14,20,0)']], SHT, SHT * .42); fade(c, [[0, 'rgba(6,14,20,.45)'], [1, 'rgba(6,14,20,0)']], 0, 430); }
+    if (o.layout === 'strip') fade(c, [[0, 'rgba(6,14,20,.9)'], [.55, 'rgba(6,14,20,.6)'], [1, 'rgba(6,14,20,0)']], SHT, SHT * .6);
+    c.fillStyle = '#fff'; c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 10;
+    let y = SHT - 364;                                   // baseline of the lowest line, clear of the reply bar
+    c.font = `600 36px ${F}`; c.fillText(o.layout === 'strip' ? `${PORTFOLIO.handle}  ·  Road to 21.1` : PORTFOLIO.handle, 64, y); y -= 70;
+    if (showProg && o.progText) {
+      c.font = `600 38px ${F}`; c.fillText(o.progText, 64, y);
+      c.shadowBlur = 0; c.fillStyle = 'rgba(255,255,255,.3)'; rrect(c, 64, y - 78, SW - 128, 14, 7); c.fill(); c.fillStyle = '#fff'; rrect(c, 64, y - 78, Math.max(14, (SW - 128) * ratio), 14, 7); c.fill();
+      c.shadowBlur = 10; y -= 138;
+    }
+    const where = [o.loc, o.wx, date].filter(Boolean);
+    if (o.layout === 'poster') {
+      fitLine(c, [pace + ' /km', hr ? hr + ' bpm' : '', o.loc].filter(Boolean).join('  ·  '), 500, 44, 64, y - 58);
+      fitLine(c, [o.wx, date].filter(Boolean).join('  ·  '), 500, 44, 64, y);
+      c.font = `800 210px ${F}`; const bb = y - 58 - 120; c.fillText(km, 64, bb); const w = c.measureText(km).width; c.font = `600 64px ${F}`; c.fillText('km', 64 + w + 16, bb);
+      if (route) drawRoute(c, route, 64, 270, 300, 300, 22, 12);
+    } else if (o.layout === 'route') {
+      statRow(c, [[pace, 'per km'], hr ? [String(hr), 'bpm'] : null, [time, 'time']].filter(Boolean), 64, y, 78);
+      const wy = y - 150; fitLine(c, where.join('  ·  '), 500, 44, 64, wy);
+      c.font = `800 170px ${F}`; const bb = wy - 70; c.fillText(km, 64, bb); const w = c.measureText(km).width; c.font = `600 56px ${F}`; c.fillText('km', 64 + w + 14, bb);
+      if (route) drawRoute(c, route, 90, 300, 900, 740, 50, 16);
+      if (f) { c.save(); c.shadowBlur = 0; rrect(c, SW - 64 - 280, 300, 280, 340, 28); c.clip(); drawCover(c, f, SW - 64 - 280, 300, 280, 340); c.restore(); c.save(); c.shadowBlur = 0; c.lineWidth = 6; c.strokeStyle = '#fff'; rrect(c, SW - 64 - 280, 300, 280, 340, 28); c.stroke(); c.restore(); }
+    } else {
+      statRow(c, [[km + ' km', 'distance'], [pace, 'per km'], hr ? [String(hr), 'bpm'] : [time, 'time']], 64, y, 78);
+      fitLine(c, where.join('  ·  '), 500, 38, 64, y - 150);
+    }
+    c.shadowBlur = 0; c.shadowColor = 'transparent';
+  }
+  function stRouteFor(run, o) { const base = ST.route || (run && run.route); return base ? (o.hide ? trimRoute(base, 200) : base) : null; }
+  function paintStory(c, f, idx) { const run = stRun(), o = stOpts(); drawStory(c, f, run, o, idx, stRouteFor(run, o)); }
+  async function stFonts() { try { await Promise.all([document.fonts.load(`800 100px "Archivo Variable"`), document.fonts.load(`500 40px "Archivo Variable"`)]); } catch (e) { /* system fonts are used instead */ } }
+  async function stDraw() { const tok = ++ST.tok; await stFonts(); if (tok !== ST.tok || ST.playing) return; paintStory($('#stCanvas').getContext('2d'), ST.frames[ST.sel] || null, ST.sel); }
+  const scheduleDraw = () => { cancelAnimationFrame(ST.raf); ST.raf = requestAnimationFrame(stDraw); };
+  function stLoop() { if (!ST.playing) return; paintStory($('#stCanvas').getContext('2d'), ST.frames[ST.sel], ST.sel); requestAnimationFrame(stLoop); }
+  function stStop() { const f = ST.frames[ST.sel]; ST.playing = false; if (f && f.kind === 'video') f.el.pause(); $('#stPlay').textContent = 'Play video'; }
+
+  function renderFrames() {
+    $('#stFrames').innerHTML = ST.frames.map((f, i) => `<div class="fr${i === ST.sel ? ' on' : ''}"><button type="button" class="fr-pick" data-fr="${i}" aria-label="Frame ${i + 1}${f.kind === 'video' ? ', video' : ''}">${f.kind === 'video' ? `<video src="${f.url}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${f.url}" alt="">`}<i>${i + 1}${f.kind === 'video' ? ' · video' : ''}</i></button>
+      <span class="fr-ctl"><button type="button" class="btn small" data-mv="${i}:-1" aria-label="Move frame ${i + 1} earlier"${i === 0 ? ' disabled' : ''}>←</button><button type="button" class="btn small" data-mv="${i}:1" aria-label="Move frame ${i + 1} later"${i === ST.frames.length - 1 ? ' disabled' : ''}>→</button><button type="button" class="btn small danger" data-rm="${i}" aria-label="Remove frame ${i + 1}">Remove</button></span></div>`).join('') || '<p class="cap">No photos yet. The preview uses a plain background until you add one.</p>';
+    const f = ST.frames[ST.sel]; $('#stCrop').hidden = !f;
+    if (f) { $('#stX').value = f.x; $('#stY').value = f.y; $('#stZ').value = Math.round(f.zoom * 100); }
+    const v = !!f && f.kind === 'video'; $('#stPlay').hidden = !v; $('#stVideoOpts').hidden = !ST.frames.some(x => x.kind === 'video');
+    $('#stSave').textContent = v ? 'Make video' : 'Save this frame';
+    $('#stSaveAll').hidden = ST.frames.length < 2;
+  }
+  function selectFrame(i) { stStop(); ST.sel = Math.max(0, Math.min(i, ST.frames.length - 1)); renderFrames(); scheduleDraw(); }
   function renderShare() {
-    const d = shRuns(), key = d.map(r => r.id).join('|');
-    if (key !== SH.optKey) {
-      const prev = $('#shRun').value;
-      $('#shRun').innerHTML = d.map(r => `<option value="${esc(r.id)}">${esc(niceDate(r.date))} ${esc(r.date.slice(0, 4))}: ${r1(r.dist)} km, ${esc(fmtPace(r.pace))}/km</option>`).join('');
-      if (d.find(r => r.id === prev)) $('#shRun').value = prev;
-      SH.optKey = key;
+    const d = stRuns(), key = d.map(r => r.id).join('|');
+    if (key !== ST.optKey) {
+      const prev = $('#stRun').value;
+      $('#stRun').innerHTML = d.map(r => `<option value="${esc(r.id)}">${esc(niceDate(r.date))} ${esc(r.date.slice(0, 4))}: ${r1(r.dist)} km, ${esc(fmtPace(r.pace))}/km</option>`).join('');
+      if (d.find(r => r.id === prev)) $('#stRun').value = prev; ST.optKey = key;
     }
-    if (!SH.edited) $('#shText').value = progressLines(data(), today).join('\n');
-    fillFromRun();
-    scheduleDraw();
+    if (!ST.progEdited) $('#stProg').value = `Longest run ${r1(stLongest())} of ${CONFIG.goalKm} km`;
+    fillFromRun(); renderFrames(); scheduleDraw();
   }
-  function fillFromRun() {
-    const run = shRuns().find(r => r.id === $('#shRun').value); if (!run) return;
-    if (!SH.locEdited) $('#shLoc').value = run.location || '';
-    if (!SH.wxEdited) $('#shWx').value = run.weather || '';
-    if (run.route) SH.route = null;
-  }
-  function scheduleDraw() { cancelAnimationFrame(SH.raf); SH.raf = requestAnimationFrame(drawShare); }
-  async function drawShare() {
-    const tok = ++SH.tok, cv = $('#shCanvas'), c = cv.getContext('2d'), W = 1080;
-    try { await Promise.all([document.fonts.load('700 40px "Space Grotesk"'), document.fonts.load('500 40px Inter')]); } catch (e) { /* system fonts are used instead */ }
-    if (tok !== SH.tok) return;
-    const run = shRuns().find(r => r.id === $('#shRun').value) || shRuns()[0]; if (!run) return;
-    const disp = '"Space Grotesk", system-ui, sans-serif', body = 'Inter, system-ui, sans-serif';
-    c.clearRect(0, 0, W, W);
-    if (SH.img) {
-      const iw = SH.img.naturalWidth, ih = SH.img.naturalHeight, sc = Math.max(W / iw, W / ih), dw = iw * sc, dh = ih * sc;
-      c.drawImage(SH.img, -(dw - W) * $('#shX').value / 100, -(dh - W) * $('#shY').value / 100, dw, dh);
-    } else { const g = c.createLinearGradient(0, 0, W, W); g.addColorStop(0, '#12333D'); g.addColorStop(1, '#0B1A21'); c.fillStyle = g; c.fillRect(0, 0, W, W); }
-    let g = c.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(0,0,0,.6)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, 300);
-    g = c.createLinearGradient(0, 480, 0, W); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.82)'); c.fillStyle = g; c.fillRect(0, 480, W, W - 480);
-    c.fillStyle = '#fff'; c.textBaseline = 'alphabetic'; c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 8;
-    c.textAlign = 'left'; c.font = `700 54px ${disp}`; c.fillText(niceDate(run.date) + ' ' + run.date.slice(0, 4), 60, 40 + 54);
-    const loc = $('#shLoc').value.trim(), wx = $('#shWx').value.trim();
-    c.font = `500 36px ${body}`; if (loc) c.fillText(loc, 60, 150);
-    if (wx) { c.textAlign = 'right'; c.font = `600 40px ${body}`; c.fillText(wx, W - 60, 94); }
-    c.textAlign = 'left';
-    const route = SH.route || run.route;
-    if (route) {
-      const bx = 700, by = 520, bw = 320, bh = 320;
-      c.shadowBlur = 0; c.fillStyle = 'rgba(8,20,26,.58)'; rrect(c, bx, by, bw, bh, 28); c.fill();
-      const xy = routeToXY(route, bw, bh, 34, 500);
-      c.beginPath(); xy.forEach((p, i) => i ? c.lineTo(bx + p[0], by + p[1]) : c.moveTo(bx + p[0], by + p[1]));
-      c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = 7; c.strokeStyle = '#4FC1D3'; c.stroke();
-      const dot = (p, col) => { c.beginPath(); c.arc(bx + p[0], by + p[1], 11, 0, 7); c.fillStyle = col; c.fill(); c.lineWidth = 3; c.strokeStyle = '#fff'; c.stroke(); };
-      dot(xy[0], '#7AD18F'); dot(xy[xy.length - 1], '#F0B04A');
+  function fillFromRun() { const run = stRun(); if (!run) return; if (!ST.locEdited) $('#stLoc').value = run.location || ''; if (!ST.wxEdited) $('#stWx').value = run.weather || ''; }
+  const LAYOUT_NOTES = { poster: 'Photo fills the frame, with the big distance and your details low down.', route: 'The route is the picture, over a blurred copy of your photo, with a small inset of the photo itself.', strip: 'The photo stays almost clean, with one slim row of numbers near the bottom.' };
+
+  $('#stFiles').addEventListener('change', e => {
+    const files = [...e.target.files]; e.target.value = ''; const msg = $('#stMsg'); msg.textContent = '';
+    for (const file of files) {
+      if (ST.frames.length >= STORY_MAX) { msg.textContent = `Instagram allows up to ${STORY_MAX} frames in one go, so the rest were skipped.`; break; }
+      const url = URL.createObjectURL(file), isVid = file.type.startsWith('video/');
+      const add = el => { ST.frames.push({ kind: isVid ? 'video' : 'image', el, url, name: file.name, x: 50, y: 40, zoom: 1 }); selectFrame(ST.frames.length - 1); };
+      if (isVid) {
+        const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+        v.onloadeddata = () => { v.onloadeddata = null; v.currentTime = 0.05; v.onseeked = () => { v.onseeked = null; add(v); }; };
+        v.onerror = () => { URL.revokeObjectURL(url); msg.textContent = 'This browser could not read that video. MP4 files from a phone work best.'; };
+      } else {
+        const img = new Image(); img.onload = () => add(img);
+        img.onerror = () => { URL.revokeObjectURL(url); msg.textContent = 'This browser could not read that photo. iPhone HEIC photos often fail; export it as JPG first.'; };
+        img.src = url;
+      }
     }
-    c.shadowBlur = 8; c.shadowColor = 'rgba(0,0,0,.45)'; c.fillStyle = '#4FC1D3'; c.font = `700 30px ${disp}`; try { c.letterSpacing = '4px'; } catch (e) { /* older browsers */ }
-    c.fillText('ROAD TO 21.1', 60, 640); try { c.letterSpacing = '0px'; } catch (e) { /* older browsers */ }
-    c.fillStyle = '#fff'; c.font = `700 170px ${disp}`; const ds = r1(run.dist).toFixed(1); c.fillText(ds, 60, 800);
-    const dwid = c.measureText(ds).width; c.font = `600 54px ${disp}`; c.fillText('km', 60 + dwid + 16, 800);
-    c.font = `600 46px ${body}`; c.fillText(fmtDur(run.dur) + '   ' + fmtPace(run.pace) + ' /km', 60, 868);
-    c.font = `500 36px ${body}`; const lines = wrapText(c, $('#shText').value.trim(), W - 120).slice(0, 3);
-    lines.forEach((l, i) => c.fillText(l, 60, 1030 - (lines.length - 1 - i) * 46));
-    c.shadowBlur = 0;
-  }
-  $('#shPhoto').addEventListener('change', e => {
-    const f = e.target.files[0]; if (!f) return;
-    const url = URL.createObjectURL(f), img = new Image();
-    img.onload = () => { if (SH.url) URL.revokeObjectURL(SH.url); SH.url = url; SH.img = img; $('#shMsg').textContent = ''; scheduleDraw(); };
-    img.onerror = () => { URL.revokeObjectURL(url); $('#shMsg').textContent = 'This browser could not read that photo. iPhone HEIC photos often fail; export it as JPG first.'; };
-    img.src = url;
   });
-  $('#shGpx').addEventListener('change', async e => {
-    const f = e.target.files[0]; if (!f) return;
+  $('#stFrames').addEventListener('click', e => {
+    const p = e.target.closest('[data-fr]'), m = e.target.closest('[data-mv]'), r = e.target.closest('[data-rm]');
+    if (p) selectFrame(+p.dataset.fr);
+    else if (m) { stStop(); const [i, dlt] = m.dataset.mv.split(':').map(Number), j = i + dlt; if (j >= 0 && j < ST.frames.length) { [ST.frames[i], ST.frames[j]] = [ST.frames[j], ST.frames[i]]; ST.sel = j; renderFrames(); scheduleDraw(); } }
+    else if (r) { stStop(); const i = +r.dataset.rm, f = ST.frames[i]; URL.revokeObjectURL(f.url); ST.frames.splice(i, 1); ST.sel = Math.min(ST.sel, Math.max(0, ST.frames.length - 1)); renderFrames(); scheduleDraw(); }
+  });
+  for (const [id, key, div] of [['#stX', 'x', 1], ['#stY', 'y', 1], ['#stZ', 'zoom', 100]]) $(id).addEventListener('input', e => { const f = ST.frames[ST.sel]; if (!f) return; f[key] = +e.target.value / div; if (!ST.playing) scheduleDraw(); });
+  for (const el of document.querySelectorAll('input[name=stLayout]')) el.addEventListener('change', () => { $('#stLayoutNote').textContent = LAYOUT_NOTES[stOpts().layout]; scheduleDraw(); });
+  for (const id of ['#stProgMode', '#stHide']) $(id).addEventListener('input', scheduleDraw);
+  $('#stRun').addEventListener('input', () => { ST.locEdited = false; ST.wxEdited = false; fillFromRun(); scheduleDraw(); });
+  $('#stLoc').addEventListener('input', () => { ST.locEdited = true; scheduleDraw(); });
+  $('#stWx').addEventListener('input', () => { ST.wxEdited = true; scheduleDraw(); });
+  $('#stProg').addEventListener('input', () => { ST.progEdited = true; scheduleDraw(); });
+  $('#stSafe').addEventListener('change', e => document.querySelectorAll('.st-zone').forEach(z => z.hidden = !e.target.checked));
+  $('#stPlay').addEventListener('click', async () => {
+    const f = ST.frames[ST.sel]; if (!f || f.kind !== 'video') return;
+    if (ST.playing) { stStop(); return; }
+    f.el.muted = true; f.el.currentTime = 0; try { await f.el.play(); } catch (e) { $('#stMsg').textContent = 'The browser would not play the video.'; return; }
+    ST.playing = true; $('#stPlay').textContent = 'Stop'; f.el.onended = stStop; stLoop();
+  });
+  $('#stGpx').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
     try {
-      const g = parseGPX(await f.text()); SH.route = g.pts;
-      const m = g.date && shRuns().find(r => r.date === g.date && Math.abs(r.dist - g.km) <= Math.max(0.5, 0.05 * r.dist));
-      if (m) { $('#shRun').value = m.id; SH.locEdited = false; SH.wxEdited = false; }
-      $('#shMsg').textContent = `Route loaded: ${r1(g.km)} km${m ? ', matched to your ' + niceDate(m.date) + ' run' : '. Pick the run it belongs to above'}.`;
-    } catch (err) { SH.route = null; $('#shMsg').textContent = err.message || 'Could not read that file.'; }
+      const g = parseGPX(await file.text()); ST.route = g.pts;
+      const m = g.date && stRuns().find(r => r.date === g.date && Math.abs(r.dist - g.km) <= Math.max(0.5, 0.05 * r.dist));
+      if (m) { $('#stRun').value = m.id; ST.locEdited = false; ST.wxEdited = false; fillFromRun(); }
+      $('#stMsg').textContent = `Route loaded: ${r1(g.km)} km${m ? ', matched to your ' + niceDate(m.date) + ' run' : '. Pick the run it belongs to above'}.`;
+    } catch (err) { ST.route = null; $('#stMsg').textContent = err.message || 'Could not read that file.'; }
     scheduleDraw();
   });
-  for (const id of ['#shX', '#shY']) $(id).addEventListener('input', scheduleDraw);
-  $('#shRun').addEventListener('input', () => { SH.locEdited = false; SH.wxEdited = false; fillFromRun(); scheduleDraw(); });
-  $('#shLoc').addEventListener('input', () => { SH.locEdited = true; scheduleDraw(); });
-  $('#shWx').addEventListener('input', () => { SH.wxEdited = true; scheduleDraw(); });
-  $('#shText').addEventListener('input', () => { SH.edited = true; scheduleDraw(); });
-  $('#shReset').addEventListener('click', () => { SH.edited = false; renderShare(); });
-  $('#shSave').addEventListener('click', async () => {
-    const msg = $('#shMsg'); await drawShare();
-    const blob = await new Promise(res => $('#shCanvas').toBlob(res, 'image/png'));
-    if (!blob) { msg.textContent = 'Could not make the picture.'; return; }
-    const run = shRuns().find(r => r.id === $('#shRun').value);
-    saveBlob(blob, 'road-to-21-' + (run ? run.date : today) + '.png'); msg.textContent = 'Picture downloaded.';
+
+  const stName = (run, i, ext) => `midlife-cardio-story-${run ? run.date : today}-${i + 1}.${ext}`;
+  function stBlobOf(f, idx) {
+    return new Promise(res => { const cv = document.createElement('canvas'); cv.width = SW; cv.height = SHT; paintStory(cv.getContext('2d'), f, idx); cv.toBlob(res, 'image/jpeg', 0.92); });
+  }
+  async function exportVideo(f, idx) {
+    if (!window.MediaRecorder) { $('#stMsg').textContent = 'This browser cannot save video. Try Chrome, Edge or Safari.'; return; }
+    const o = stOpts(), v = f.el, secs = Math.min(o.secs, v.duration || o.secs), run = stRun(), route = stRouteFor(run, o);
+    const cv = document.createElement('canvas'); cv.width = SW; cv.height = SHT; const c = cv.getContext('2d');
+    const types = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'], mime = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const stream = cv.captureStream(30);
+    if (!o.mute) { try {
+      if (!f.ac) { f.ac = new (window.AudioContext || window.webkitAudioContext)(); f.src = f.ac.createMediaElementSource(v); f.dest = f.ac.createMediaStreamDestination(); f.src.connect(f.dest); }
+      if (f.ac.state === 'suspended') await f.ac.resume(); f.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t)); v.muted = false;
+    } catch (e) { /* no sound; the picture still records */ } }
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8e6 } : { videoBitsPerSecond: 8e6 }), chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    const done = new Promise(res => { rec.onstop = res; });
+    await stFonts(); v.currentTime = 0; await new Promise(r => { v.onseeked = () => { v.onseeked = null; r(); }; if (v.currentTime === 0) r(); });
+    rec.start(250); try { await v.play(); } catch (e) { rec.stop(); $('#stMsg').textContent = 'The browser would not play the video.'; return; }
+    const t0 = performance.now();
+    await new Promise(res => { const tick = () => { const el = (performance.now() - t0) / 1000; drawStory(c, f, run, o, idx, route); $('#stMsg').textContent = `Making the video: ${Math.min(secs, Math.floor(el))} of ${Math.round(secs)} seconds. Keep this tab open.`; if (v.ended || el >= secs) res(); else requestAnimationFrame(tick); }; tick(); });
+    v.pause(); v.muted = true; rec.stop(); await done;
+    const type = rec.mimeType || mime || 'video/webm', ext = type.includes('mp4') ? 'mp4' : 'webm', blob = new Blob(chunks, { type });
+    saveBlob(blob, stName(run, idx, ext));
+    $('#stMsg').textContent = ext === 'webm' ? 'Video saved as WebM. Instagram often rejects WebM. For MP4, use Chrome or Safari, or convert it first.' : /vp[89]|av01/.test(type) ? 'Video saved, but this browser used a codec Instagram may reject. If the upload fails, try Chrome or Safari on a phone or laptop.' : 'Video saved.';
+    scheduleDraw();
+  }
+  $('#stSave').addEventListener('click', async () => {
+    if (ST.busy) return; ST.busy = true; stStop(); const msg = $('#stMsg'), f = ST.frames[ST.sel] || null, run = stRun();
+    try {
+      await stFonts();
+      if (f && f.kind === 'video') await exportVideo(f, ST.sel);
+      else { const b = await stBlobOf(f, ST.sel); if (!b) { msg.textContent = 'Could not make the picture.'; } else { saveBlob(b, stName(run, ST.sel, 'jpg')); msg.textContent = 'Frame saved.'; } }
+    } finally { ST.busy = false; }
+  });
+  $('#stSaveAll').addEventListener('click', async () => {
+    if (ST.busy) return; ST.busy = true; stStop(); const msg = $('#stMsg'), run = stRun(); let n = 0, skipped = 0;
+    try {
+      await stFonts();
+      for (let i = 0; i < ST.frames.length; i++) { if (ST.frames[i].kind === 'video') { skipped++; continue; } const b = await stBlobOf(ST.frames[i], i); if (b) { saveBlob(b, stName(run, i, 'jpg')); n++; await new Promise(r => setTimeout(r, 450)); } }
+      msg.textContent = `${n} frame${n === 1 ? '' : 's'} saved in order.${skipped ? ` ${skipped} video${skipped === 1 ? '' : 's'} skipped; save each one with Make video.` : ''} If your browser asks, allow multiple downloads.`;
+    } finally { ST.busy = false; }
+  });
+  if (navigator.canShare && navigator.share) $('#stShare').hidden = false;
+  $('#stShare').addEventListener('click', async () => {
+    const msg = $('#stMsg'), run = stRun(); await stFonts();
+    const files = []; for (let i = 0; i < ST.frames.length; i++) if (ST.frames[i].kind === 'image') { const b = await stBlobOf(ST.frames[i], i); if (b) files.push(new File([b], stName(run, i, 'jpg'), { type: 'image/jpeg' })); }
+    if (!files.length) { const b = await stBlobOf(null, 0); files.push(new File([b], stName(run, 0, 'jpg'), { type: 'image/jpeg' })); }
+    try { if (!navigator.canShare({ files })) { msg.textContent = 'This browser cannot share these files. Use Save instead.'; return; } await navigator.share({ files }); }
+    catch (e) { if (e && e.name !== 'AbortError') msg.textContent = 'Sharing did not work here. Use Save instead.'; }
   });
 
   /* ---------- render ---------- */
